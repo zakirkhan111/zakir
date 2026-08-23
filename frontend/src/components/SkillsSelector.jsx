@@ -64,17 +64,28 @@ export default function SkillsSelector({ value = [], onChange, placeholder = 'Ch
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
-          <input
-            ref={inputRef}
-            className="input mb-3"
-            placeholder="Type a custom skill, press Enter or , to add"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onKeyDown}
-          />
-          <div className="flex flex-wrap gap-2">
-            {SKILL_PRESETS.map((skill) => {
+        <div className="relative block mt-2 w-full rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+          <div className="relative mb-3">
+            <input
+              ref={inputRef}
+              className="input pr-20"
+              placeholder="Type a custom skill, press Enter or , to add"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={onKeyDown}
+            />
+            <button
+              type="button"
+              onClick={() => addSkill(query)}
+              disabled={!query.trim()}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-bold text-brand-600 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-brand-400 dark:hover:bg-brand-950/40"
+            >
+              + Add
+            </button>
+          </div>
+          {!query.trim() && (
+            <div className="flex flex-wrap gap-2">
+              {SKILL_PRESETS.map((skill) => {
               const active = value.some((s) => s.toLowerCase() === skill.toLowerCase())
               return (
                 <button
@@ -90,8 +101,9 @@ export default function SkillsSelector({ value = [], onChange, placeholder = 'Ch
                   {skill}
                 </button>
               )
-            })}
-          </div>
+              })}
+            </div>
+          )}
         </div>
       )}
 
