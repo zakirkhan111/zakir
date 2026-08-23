@@ -168,22 +168,9 @@ exports.updateProject = catchAsync(async (req, res, next) => {
     'requiredVolunteers', 'skillsRequired', 'status',
   ];
   allowedFields.forEach((field) => {
-    if (req.body[field] === undefined) return;
-
-    if (field === 'location' && typeof req.body[field] === 'string') {
-      // Multipart form submissions (the Edit Project modal) send location as
-      // plain text, not JSON — only parse JSON when it actually is JSON,
-      // otherwise normalize the text to the Project schema shape, exactly
-      // like createProject does. Never let a raw JSON.parse throw here.
-      try {
-        project.location = JSON.parse(req.body[field]);
-      } catch (_) {
-        project.location = { city: req.body[field].trim(), address: req.body[field].trim() };
-      }
-      return;
+    if (req.body[field] !== undefined) {
+      project[field] = field === 'location' && typeof req.body[field] === 'string' ? JSON.parse(req.body[field]) : req.body[field];
     }
-
-    project[field] = req.body[field];
   });
 
   if (req.file) {
@@ -191,24 +178,6 @@ exports.updateProject = catchAsync(async (req, res, next) => {
   }
 
   await project.save();
-
-  // Notify every applied/joined volunteer that the project they applied to
-  // was updated, so they never miss changes made after they joined.
-  if (project.members?.length) {
-    const { createNotification } = require('./notificationController');
-    await Promise.all(
-      project.members.map((m) =>
-        createNotification({
-          recipient: m.user,
-          sender: req.user._id,
-          type: 'general',
-          title: 'Project Updated',
-          message: `"${project.title}" was just updated by its project manager.`,
-          relatedProject: project._id,
-        }).catch(() => {})
-      )
-    );
-  }
 
   res.status(200).json({ status: 'success', data: { project } });
 });

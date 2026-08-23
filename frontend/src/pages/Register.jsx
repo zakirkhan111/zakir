@@ -2,9 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Logo from '../components/Logo'
-import SkillsSelector from '../components/SkillsSelector'
-import AvatarCropModal from '../components/AvatarCropModal'
-import { User, Mail, Lock, Phone, MapPin, UploadCloud, GraduationCap, Briefcase } from 'lucide-react'
+import { User, Mail, Lock, Phone, MapPin, Sparkles, UploadCloud, GraduationCap, Briefcase, ChevronDown, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const ROLES = [
@@ -12,31 +10,33 @@ const ROLES = [
   { value: 'project_manager', label: 'Project Manager', icon: Briefcase },
 ]
 
+const SKILL_OPTIONS = ['Web Development', 'Design', 'Marketing', 'Teamwork', 'Event Management', 'Communication', 'Social Work']
+
 export default function Register() {
   const { register } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [photo, setPhoto] = useState(null)
   const [preview, setPreview] = useState(null)
-  const [cropFile, setCropFile] = useState(null)
   const [form, setForm] = useState({
-    name: '', email: '', password: '', phone: '', city: '', role: 'student',
+    name: '', email: '', password: '', phone: '', city: '', skills: '', role: 'student',
   })
   const [selectedSkills, setSelectedSkills] = useState([])
+  const [skillsOpen, setSkillsOpen] = useState(false)
 
-  // Clicking the avatar placeholder intercepts the native file picker's result
-  // and opens the crop/pan modal instead of using the raw file directly.
-  const onPickPhoto = (e) => {
-    const f = e.target.files?.[0]
-    e.target.value = '' // allow re-selecting the same file later
-    if (!f) return
-    setCropFile(f)
+  const toggleSkill = (skill) => {
+    const nextSkills = selectedSkills.includes(skill)
+      ? selectedSkills.filter((item) => item !== skill)
+      : [...selectedSkills, skill]
+    setSelectedSkills(nextSkills)
+    setForm((current) => ({ ...current, skills: nextSkills.join(', ') }))
   }
 
-  const onCropSet = (croppedFile) => {
-    setPhoto(croppedFile)
-    setPreview(URL.createObjectURL(croppedFile))
-    setCropFile(null)
+  const onPhoto = (e) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setPhoto(f)
+    setPreview(URL.createObjectURL(f))
   }
 
   const submit = async (e) => {
@@ -45,7 +45,6 @@ export default function Register() {
     try {
       const fd = new FormData()
       Object.entries(form).forEach(([k, v]) => fd.append(k, v))
-      fd.append('skills', selectedSkills.join(', '))
       if (photo) fd.append('profilePicture', photo)
       await register(fd)
       navigate('/', { replace: true })
@@ -85,12 +84,12 @@ export default function Register() {
           <form onSubmit={submit} className="space-y-4">
             <div className="flex items-center gap-4">
               <label htmlFor="photo" className="h-16 w-16 shrink-0 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-700 grid place-items-center cursor-pointer overflow-hidden bg-gray-50 dark:bg-gray-800">
-                {preview ? <img src={preview} className="h-full w-full object-cover" alt="Profile preview" /> : <UploadCloud className="h-5 w-5 text-gray-400" />}
+                {preview ? <img src={preview} className="h-full w-full object-cover" /> : <UploadCloud className="h-5 w-5 text-gray-400" />}
               </label>
-              <input id="photo" type="file" accept="image/*" className="hidden" onChange={onPickPhoto} />
+              <input id="photo" type="file" accept="image/*" className="hidden" onChange={onPhoto} />
               <div>
                 <p className="text-sm font-semibold">Profile picture</p>
-                <p className="text-xs text-gray-400">Optional — PNG or JPG. You'll be able to crop it.</p>
+                <p className="text-xs text-gray-400">Optional — PNG or JPG</p>
               </div>
             </div>
 
@@ -108,7 +107,7 @@ export default function Register() {
               <div>
                 <label className="label">Password</label>
                 <div className="relative"><Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input type="password" required minLength={8} className="input pl-10" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" /></div>
+                  <input type="password" required minLength={6} className="input pl-10" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" /></div>
               </div>
               <div>
                 <label className="label">Phone</label>
@@ -122,7 +121,29 @@ export default function Register() {
               </div>
               <div className="sm:col-span-2">
                 <label className="label">Skills</label>
-                <SkillsSelector value={selectedSkills} onChange={setSelectedSkills} />
+                <div className="relative">
+                  <button type="button" onClick={() => setSkillsOpen((isOpen) => !isOpen)} aria-expanded={skillsOpen} className="input flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 text-left">
+                    <span className="flex items-center gap-2 text-sm">
+                      <Sparkles className="h-4 w-4 text-gray-400" />
+                      {selectedSkills.length ? `${selectedSkills.length} skill${selectedSkills.length > 1 ? 's' : ''} selected` : 'Choose your skills'}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${skillsOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {skillsOpen && <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                    <div className="flex flex-wrap gap-2">
+                      {SKILL_OPTIONS.map((skill) => (
+                        <button type="button" key={skill} onClick={() => toggleSkill(skill)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${selectedSkills.includes(skill) ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-brand-50 dark:bg-gray-800 dark:text-gray-300'}`}>
+                          {skill}
+                        </button>
+                      ))}
+                    </div>
+                  </div>}
+                  {selectedSkills.length > 0 && <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedSkills.map((skill) => <button key={skill} type="button" onClick={() => toggleSkill(skill)} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-red-50 hover:text-red-600 dark:bg-brand-950/40 dark:text-brand-300" title={`Remove ${skill}`}>
+                      {skill}<X className="h-3.5 w-3.5" />
+                    </button>)}
+                  </div>}
+                </div>
               </div>
             </div>
 
@@ -133,10 +154,6 @@ export default function Register() {
           Already have an account? <Link to="/login" className="font-semibold text-brand-600 dark:text-brand-400">Sign in</Link>
         </p>
       </div>
-
-      {cropFile && (
-        <AvatarCropModal file={cropFile} onClose={() => setCropFile(null)} onSet={onCropSet} />
-      )}
     </div>
   )
 }

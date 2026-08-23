@@ -37,29 +37,10 @@ exports.toggleSuspendUser = catchAsync(async (req, res, next) => {
 });
 
 // @route DELETE /api/v1/admin/users/:id
-// Super-admin purge: a logged-in admin may delete any account — including rogue,
-// unverified, or duplicate admin documents — EXCEPT their own currently-logged-in
-// account (to prevent accidental self-lockout of the last admin session).
 exports.deleteUser = catchAsync(async (req, res, next) => {
   const user = await User.findById(req.params.id);
   if (!user) return next(new AppError('User not found.', 404));
-
-  if (user._id.toString() === req.user._id.toString()) {
-    return next(new AppError('You cannot delete your own account while logged in.', 400));
-  }
-
-  // Clean up records that reference this user so deletion never fails silently
-  // or leaves orphaned data behind.
-  const Project = require('../models/Project');
-  const Task = require('../models/Task');
-  const Application = require('../models/Application');
-
-  await Promise.all([
-    Project.deleteMany({ projectManager: user._id }),
-    Task.deleteMany({ $or: [{ assignedTo: user._id }, { assignedBy: user._id }] }),
-    Application.deleteMany({ student: user._id }),
-    Project.updateMany({ 'members.user': user._id }, { $pull: { members: { user: user._id } } }),
-  ]);
+  if (user.role === 'admin') return next(new AppError('Admins cannot be deleted.', 400));
 
   await user.deleteOne();
   res.status(204).json({ status: 'success', data: null });

@@ -19,20 +19,8 @@ export default function AdminUsers() {
   }
   useEffect(() => { load() }, [roleFilter])
 
-  const suspend = async (id) => {
-    try { await AdminAPI.suspendUser(id); toast.success('User status updated'); load() }
-    catch (err) { toast.error(err?.response?.data?.message || 'Failed to update user status') }
-  }
-  const remove = async (id) => {
-    if (!confirm('Delete this user? This will remove their projects, applications and tasks too.')) return
-    try {
-      await AdminAPI.deleteUser(id)
-      toast.success('User deleted')
-      load()
-    } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to delete user')
-    }
-  }
+  const suspend = async (id) => { try { await AdminAPI.suspendUser(id); toast.success('User status updated'); load() } catch { toast.error('Failed') } }
+  const remove = async (id) => { if (!confirm('Delete this user?')) return; try { await AdminAPI.deleteUser(id); load() } catch { toast.error('Failed') } }
 
   return (
     <Layout>
@@ -65,7 +53,7 @@ export default function AdminUsers() {
                   </td>
                   <td className="p-4 capitalize">{u.role?.replace('_', ' ')}{u.role === 'admin' && <ShieldCheck className="inline h-3.5 w-3.5 ml-1 text-brand-500" />}</td>
                   <td className="p-4">{u.city}</td>
-                  <td className="p-4"><span className={`badge ${u.status === 'suspended' ? 'bg-red-50 text-red-500 dark:bg-red-950/40' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40'}`}>{u.status === 'suspended' ? 'Suspended' : 'Active'}</span></td>
+                  <td className="p-4"><span className={`badge ${u.suspended ? 'bg-red-50 text-red-500 dark:bg-red-950/40' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40'}`}>{u.suspended ? 'Suspended' : 'Active'}</span></td>
                   <td className="p-4 flex gap-1">
                     <button onClick={() => suspend(u._id)} className="p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-600" title="Toggle suspend"><Ban className="h-4 w-4" /></button>
                     <button onClick={() => remove(u._id)} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-red-500" title="Delete"><Trash2 className="h-4 w-4" /></button>

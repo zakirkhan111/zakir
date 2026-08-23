@@ -103,11 +103,7 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
   const user = await User.findById(req.user._id).select('+password');
   if (!(await user.comparePassword(currentPassword))) {
-    // Intentionally 400, not 401: an incorrect *current* password is a validation
-    // failure on this form, not an authentication failure on the active session.
-    // Returning 401 here would trip the global axios interceptor and silently log
-    // the user out / bounce them to the login screen — never do that.
-    return next(new AppError('Your current password is incorrect.', 400));
+    return next(new AppError('Your current password is incorrect.', 401));
   }
 
   user.password = newPassword;

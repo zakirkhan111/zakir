@@ -1,14 +1,9 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import Layout from '../components/Layout'
 import ProjectCard from '../components/ProjectCard'
 import ProjectsMap from '../components/ProjectsMap'
 import { ProjectAPI } from '../api/client'
 import { Search, SlidersHorizontal, MapIcon, LayoutGrid, X } from 'lucide-react'
-
-// Remembers where the user was scrolled to on Discover so returning from a
-// project's detail page via the "Back to Discovery" button lands them back
-// at the exact same spot instead of snapping to the top.
-const SCROLL_KEY = 'ih_discovery_scroll'
 
 const CATEGORIES = ['Environment', 'Education', 'Health', 'Technology', 'Poverty Relief', 'Disaster Relief']
 const STATUSES = ['approved', 'active', 'pending', 'completed']
@@ -45,20 +40,6 @@ export default function Discover() {
     const t = setTimeout(fetchProjects, 350)
     return () => clearTimeout(t)
   }, [fetchProjects])
-
-  // Restore the exact scroll position we were at before navigating into a
-  // project's detail page, once the grid has finished rendering.
-  useEffect(() => {
-    if (loading) return
-    const saved = sessionStorage.getItem(SCROLL_KEY)
-    if (saved) {
-      requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10) || 0))
-    }
-  }, [loading])
-
-  const rememberScrollPosition = () => {
-    sessionStorage.setItem(SCROLL_KEY, String(window.scrollY))
-  }
 
   const clear = () => setFilters({ search: '', category: '', location: '', status: '', skills: '', sort: '-createdAt' })
   const activeCount = Object.entries(filters).filter(([k, v]) => k !== 'sort' && v).length
@@ -121,7 +102,7 @@ export default function Discover() {
         ) : projects.length === 0 ? (
           <div className="card p-16 text-center text-gray-400">No projects match your filters.</div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5" onClickCapture={rememberScrollPosition}>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {projects.map((p) => <ProjectCard key={p._id} project={p} />)}
           </div>
         )}

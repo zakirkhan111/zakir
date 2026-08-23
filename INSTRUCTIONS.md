@@ -1,22 +1,20 @@
-# ImpactHub — Teacher / Evaluator Deployment Guide
-
-This guide walks a tech teacher or judge through running ImpactHub locally end-to-end.
+# ImpactHub deployment guide
 
 ## 1. Extract and install
 
-```bash
+Extract the submitted workspace, then open two terminals:
+
+```powershell
 cd backend
 npm install
 
-cd ../frontend
+cd ..\frontend
 npm install
 ```
 
-## 2. Configure environment variables
+## 2. Configure the backend
 
-`backend/.env` and `frontend/.env` are already included with working evaluation
-credentials (MongoDB Atlas cluster, ImgBB key, and SMTP creds). If you'd like to
-point at your own database instead, edit `backend/.env`:
+Create or update `backend/.env` using the credentials supplied for evaluation:
 
 ```env
 PORT=5000
@@ -28,73 +26,39 @@ SMTP_PASS=your-smtp-password-or-app-password
 CLIENT_URL=http://localhost:5173
 ```
 
-`IMGBB_API_KEY`, `SMTP_USER`, and `SMTP_PASS` are only needed for image uploads
-and outgoing email — the rest of the platform works locally without them.
+`IMGBB_API_KEY`, `SMTP_USER`, and `SMTP_PASS` are required only for image-upload and email delivery features. The application can otherwise be reviewed locally without sending email.
 
-## 3. Prepare a clean database
+## 3. Seed the evaluation data
 
-With the backend folder open, run:
+With the backend terminal open, run:
 
-```bash
+```powershell
 npm run seed
 ```
 
-This **wipes every automated/mock project** (and their tasks, applications, and
-comments) so the database starts clean, and creates the default administrator
-account **only if it doesn't already exist**:
+This creates the default administrator (if it does not already exist) and inserts 15 active, geo-tagged community campaigns. Existing unrelated database data is preserved.
 
-```
-Email:    admin@impacthub.com
-Password: Admin@12345
-```
+- Email: `admin@impacthub.com`
+- Password: `Admin@12345`
 
-It is safe to re-run at any point — it never touches projects created by real
-project managers through the app UI.
+## 4. Run both applications
 
-## 4. Run the platform
+Terminal 1:
 
-Terminal 1 (backend, port 5000):
-```bash
+```powershell
 cd backend
 npm run dev
 ```
 
-Terminal 2 (frontend, port 5173):
-```bash
+Terminal 2:
+
+```powershell
 cd frontend
 npm run dev
 ```
 
-Open `http://localhost:5173/` — this is the **Login** screen. The app boots
-straight to Login/Dashboard; there is no separate marketing landing page.
+Open the Vite URL printed in Terminal 2 (normally `http://localhost:5173`). The backend listens on `http://localhost:5000` by default.
 
-## 5. Suggested evaluation flow
+## Production check
 
-1. **Log in as admin** (`admin@impacthub.com` / `Admin@12345`) — view Users and
-   Projects management, approve/reject pending projects, delete rogue accounts.
-2. **Register a Project Manager** account, create a project (pending admin
-   approval), then approve it from the admin account.
-3. **Register a Student** account, pick skills from the hybrid skills selector
-   on Register, upload and crop a profile photo, then go to **Discover** and
-   apply to the project you created.
-4. Back in the Project Manager account, open the project and **Approve** the
-   student's application from the *Volunteer Applications* panel — note the
-   applicant's contact details are visible only to that project's manager (and
-   admin), never intercepted by other managers.
-5. As the approved student, the **Task Board** and **Discussion forum** unlock;
-   before approval they were shown blurred/locked.
-6. Check the **Leaderboard**, the **Notification bell** (instant mark-all-read
-   on open, closes on outside click), and the **Profile page** (Edit Profile
-   toggle, avatar crop modal, collapsible password accordion — an incorrect
-   current password shows a toast and never logs you out).
-7. Visit **About / Privacy / Terms** from the footer — each has an animated
-   "← Back to Dashboard" button.
-
-## Troubleshooting
-
-- **Discovery only shows a few projects**: fixed — discovery now returns up to
-  100 projects per page instead of the old 12-project cap.
-- **Wrong password on Profile logs me out**: fixed — an incorrect current
-  password now returns a form error, not a session-ending one.
-- **Ports in use**: backend defaults to `5000`, frontend (Vite) to `5173`.
-  Change `PORT` in `backend/.env` or pass `--port` to `vite` if needed.
+Before submission, build the frontend with `cd frontend; npm run build`. Confirm that the production deployment sets `VITE_API_URL` to the public backend URL when frontend and API are hosted on separate origins.
