@@ -1,12 +1,10 @@
 {
   "services": {
     "frontend": {
-      "root": "frontend",
-      "framework": "nextjs"
+      "root": "frontend"
     },
     "backend": {
-      "root": "backend/api",
-      "framework": "express"
+      "root": "backend"
     }
   }
 }
