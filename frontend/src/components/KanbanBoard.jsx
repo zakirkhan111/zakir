@@ -21,16 +21,16 @@ const priorityColor = {
   LOW: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
 }
 
-function TaskCard({ task, dragging }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task._id })
+function TaskCard({ task, dragging, readOnly = false }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task._id, disabled: readOnly })
   const style = { transform: CSS.Transform.toString(transform), transition }
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
-      className={`card p-3.5 space-y-2 cursor-grab active:cursor-grabbing ${isDragging ? 'opacity-40' : ''} ${dragging ? 'rotate-2 shadow-2xl' : ''}`}
+      {...(readOnly ? {} : attributes)}
+      {...(readOnly ? {} : listeners)}
+      className={`card p-3.5 space-y-2 ${readOnly ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${isDragging ? 'opacity-40' : ''} ${dragging ? 'rotate-2 shadow-2xl' : ''}`}
     >
       <p className="font-semibold text-sm leading-snug">{task.title}</p>
       {task.description && <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{task.description}</p>}
@@ -53,22 +53,22 @@ function TaskCard({ task, dragging }) {
   )
 }
 
-function Column({ id, label, color, tasks }) {
-  const { setNodeRef, isOver } = useDroppable({ id })
+function Column({ id, label, color, tasks, readOnly }) {
+  const { setNodeRef, isOver } = useDroppable({ id, disabled: readOnly })
   return (
     <div className={`rounded-2xl p-3 flex-1 min-w-[280px] border-2 border-dashed transition-colors ${isOver ? 'border-brand-400 bg-brand-50/40 dark:bg-brand-950/20' : 'border-transparent bg-gray-50 dark:bg-gray-900/50'}`}>
       <div className={`badge ${color} mb-3`}>{label} · {tasks.length}</div>
       <div ref={setNodeRef} className="space-y-2.5 min-h-[120px]">
         <SortableContext items={tasks.map((t) => t._id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((t) => <TaskCard key={t._id} task={t} />)}
+          {tasks.map((t) => <TaskCard key={t._id} task={t} readOnly={readOnly} />)}
         </SortableContext>
-        {tasks.length === 0 && <p className="text-xs text-gray-400 text-center py-6">Drop tasks here</p>}
+        {tasks.length === 0 && <p className="text-xs text-gray-400 text-center py-6">{readOnly ? 'No tasks in this stage' : 'Drop tasks here'}</p>}
       </div>
     </div>
   )
 }
 
-export default function KanbanBoard({ tasks, setTasks }) {
+export default function KanbanBoard({ tasks, setTasks, readOnly = false }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
   const [activeId, setActiveId] = useState(null)
 
@@ -83,9 +83,10 @@ export default function KanbanBoard({ tasks, setTasks }) {
 
   const findTask = (id) => tasks.find((t) => t._id === id)
 
-  const handleDragStart = (e) => setActiveId(e.active.id)
+  const handleDragStart = (e) => { if (!readOnly) setActiveId(e.active.id) }
 
   const handleDragEnd = async (e) => {
+    if (readOnly) return
     const { active, over } = e
     setActiveId(null)
     if (!over) return
@@ -119,7 +120,7 @@ export default function KanbanBoard({ tasks, setTasks }) {
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {COLUMNS.map((col) => (
-          <Column key={col.id} id={col.id} label={col.label} color={col.color} tasks={grouped[col.id]} />
+          <Column key={col.id} id={col.id} label={col.label} color={col.color} tasks={grouped[col.id]} readOnly={readOnly} />
         ))}
       </div>
       <DragOverlay>{activeTask && <TaskCard task={activeTask} dragging />}</DragOverlay>

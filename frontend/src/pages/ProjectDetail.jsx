@@ -4,7 +4,7 @@ import Layout from '../components/Layout'
 import ProgressBar from '../components/ProgressBar'
 import { ProjectAPI, ApplicationAPI, CommentAPI, TaskAPI, SkillMatchAPI } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import { MapPin, Calendar, Users, Tag, Send, Trash2, Star, Sparkles, CheckCircle2, XCircle } from 'lucide-react'
+import { MapPin, Calendar, Users, Tag, Send, Trash2, Star, Sparkles, CheckCircle2, XCircle, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDistanceToNow } from 'date-fns'
 import KanbanBoard from '../components/KanbanBoard'
@@ -22,7 +22,14 @@ export default function ProjectDetail() {
   const [match, setMatch] = useState(null)
   const [review, setReview] = useState({ rating: 5, comment: '' })
   const [applications, setApplications] = useState([])
+  const [applicationsLoaded, setApplicationsLoaded] = useState(false)
   const [showMap, setShowMap] = useState(false)
+  const [taskForm, setTaskForm] = useState({ title: '', description: '', assignedTo: '', priority: 'MEDIUM', deadline: '' })
+  const [addingTask, setAddingTask] = useState(false)
+
+  const normalizeApplications = (records) => Array.isArray(records)
+    ? records.map((application) => ({ ...application, student: application.user || application.student || null }))
+    : []
 
   const load = () => {
     ProjectAPI.get(id)
@@ -35,24 +42,31 @@ export default function ProjectDetail() {
       const result = res.data?.data?.comments || res.data?.data
       setComments(Array.isArray(result) ? result : [])
     }).catch(() => setComments([]))
-    if (user?.role !== 'admin') {
-      TaskAPI.forProject(id).then((res) => {
-        const result = res.data?.data?.tasks || res.data?.data
-        setTasks(Array.isArray(result) ? result : [])
-      }).catch(() => setTasks([]))
-    }
+    TaskAPI.forProject(id).then((res) => {
+      const result = res.data?.data?.tasks || res.data?.data
+      setTasks(Array.isArray(result) ? result : [])
+    }).catch(() => setTasks([]))
     if (user?.role === 'student') {
       SkillMatchAPI.matchMe(id).then((res) => setMatch(res.data?.data)).catch(() => {})
     }
     if (user?.role === 'project_manager' || user?.role === 'admin') {
       ApplicationAPI.forProject(id).then((res) => {
         const result = res.data?.data?.applications || res.data?.data
-        setApplications(Array.isArray(result) ? result : [])
-      }).catch(() => setApplications([]))
+        setApplications(normalizeApplications(result))
+      }).catch(() => setApplications([])).finally(() => setApplicationsLoaded(true))
+    } else if (user?.role === 'student') {
+      ApplicationAPI.mine().then((res) => {
+        const result = res.data?.data?.applications || res.data?.data
+        setApplications(normalizeApplications(result).filter((application) => String(application.project?._id || application.project) === String(id)))
+      }).catch(() => setApplications([])).finally(() => setApplicationsLoaded(true))
     }
   }
 
   const decide = async (appId, decision) => {
+    if (!appId) {
+      toast.error('Application reference is missing. Refresh and try again.')
+      return
+    }
     try {
       await ApplicationAPI.decide(appId, decision)
       toast.success(`Application ${decision}`)
@@ -104,14 +118,39 @@ export default function ProjectDetail() {
     }
   }
 
+  const createTask = async (event) => {
+    event.preventDefault()
+    try {
+      const response = await TaskAPI.create({ projectId: id, ...taskForm })
+      const createdTask = response.data?.data?.task || response.data?.data
+      if (createdTask) setTasks((current) => [createdTask, ...current])
+      setTaskForm({ title: '', description: '', assignedTo: '', priority: 'MEDIUM', deadline: '' })
+      setAddingTask(false)
+      toast.success('Task assigned')
+      load()
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not create task')
+    }
+  }
+
   if (!project) {
     return <Layout><div className="card h-64 animate-pulse bg-gray-100 dark:bg-gray-800" /></Layout>
   }
 
-  const filled = project.volunteers?.length || project.approvedVolunteersCount || 0
   const required = project.requiredVolunteers || project.volunteersRequired || 1
-  const canManageTasks = user?.role === 'project_manager' || user?.role === 'admin'
-  const isManagerOfThis = user?._id === (project.manager?._id || project.manager) || user?._id === (project.projectManager?._id || project.projectManager)
+  const approvedCount = applicationsLoaded
+    ? applications.filter((application) => application?.status === 'approved').length
+    : (project.currentVolunteersCount || project.volunteers?.length || project.approvedVolunteersCount || 0)
+  const capacityPercent = Math.min(100, Math.round((approvedCount / required) * 100) || 0)
+  const currentUserId = String(user?._id || user?.id || '')
+  const managerId = String(project.manager?._id || project.manager || project.projectManager?._id || project.projectManager || '')
+  const isManagerOfThis = Boolean(currentUserId) && currentUserId === managerId
+  const canManageTasks = user?.role === 'project_manager' && isManagerOfThis
+  const approvedMembers = (project.members || []).map((member) => member.user).filter(Boolean)
+  const approvedAssignees = applications
+    .filter((application) => application?.status === 'approved' && application?.student)
+    .map((application) => application.student)
+  const isApprovedMember = approvedMembers.some((member) => (member?._id || member)?.toString() === (user?._id || user?.id)?.toString())
   const projectImage = imageUrl(project.image) || imageUrl(project.projectImage)
   const locationLabel = typeof project?.location === 'string'
     ? project.location
@@ -144,7 +183,7 @@ export default function ProjectDetail() {
               <span className="inline-flex items-center gap-1.5"><Tag className="h-4 w-4" /> {project.category}</span>
               <span className="inline-flex items-center gap-1.5"><MapPin className="h-4 w-4" /> {locationLabel}</span>
               <span className="inline-flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {new Date(project.startDate).toLocaleDateString()} – {new Date(project.endDate).toLocaleDateString()}</span>
-              <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4" /> {filled}/{required} volunteers</span>
+              <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4" /> {approvedCount}/{required} volunteers</span>
             </div>
             {skills.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -153,7 +192,7 @@ export default function ProjectDetail() {
                 ))}
               </div>
             )}
-            <ProgressBar value={Math.round((filled / required) * 100) || 0} label="Volunteer capacity" />
+            <ProgressBar value={capacityPercent} label="Volunteer capacity" />
 
             {match && (
               <div className="rounded-xl bg-brand-50 dark:bg-brand-950/30 p-3.5 flex items-center gap-2 text-sm">
@@ -176,7 +215,7 @@ export default function ProjectDetail() {
             <h2 className="mt-1 text-xl font-extrabold">Make an impact</h2>
           </div>
           <div className="space-y-3 text-sm">
-            <div className="flex justify-between gap-3"><span className="text-gray-500">Volunteer capacity</span><strong>{filled}/{required}</strong></div>
+            <div className="flex justify-between gap-3"><span className="text-gray-500">Volunteer capacity</span><strong>{approvedCount}/{required}</strong></div>
             <div className="flex justify-between gap-3"><span className="text-gray-500">Starts</span><strong>{project?.startDate ? new Date(project.startDate).toLocaleDateString() : 'TBA'}</strong></div>
             <div className="flex justify-between gap-3"><span className="text-gray-500">Ends</span><strong>{project?.endDate ? new Date(project.endDate).toLocaleDateString() : 'TBA'}</strong></div>
             <div className="flex justify-between gap-3"><span className="text-gray-500">Location</span><strong className="text-right">{locationLabel}</strong></div>
@@ -191,7 +230,7 @@ export default function ProjectDetail() {
         </aside>
         </div>
 
-        {canManageTasks && (
+        {(canManageTasks || user?.role === 'admin') && (
           <div className="card p-5 space-y-3">
             <h2 className="font-bold text-lg">Volunteer Applications</h2>
             {applications.length === 0 ? (
@@ -199,16 +238,25 @@ export default function ProjectDetail() {
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {applications.map((a) => (
-                  <div key={a._id} className="flex items-center gap-3 py-3">
-                    <img src={imageUrl(a.student?.profilePicture) || `https://ui-avatars.com/api/?background=random&name=${encodeURIComponent(a.student?.name || 'U')}`} className="h-9 w-9 rounded-full object-cover" />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">{a.student?.name || 'Student'}</p>
+                  <div key={a._id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
+                    <img src={imageUrl(a.student?.profilePicture) || `https://ui-avatars.com/api/?background=random&name=${encodeURIComponent(a.student?.name || 'U')}`} className="h-10 w-10 rounded-full object-cover" alt="" />
+                    <div className="application-details min-w-0 flex-1 space-y-2 py-2">
+                      <p className="font-bold leading-tight">{a.student?.name || 'Student'}</p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                        {a.student?.city && <span>{a.student.city}</span>}
+                        {a.student?.phone && <><span className="text-gray-300">•</span><span>{a.student.phone}</span></>}
+                        {a.student?.email && <><span className="text-gray-300">•</span><span className="break-all">{a.student.email}</span></>}
+                      </div>
+                      {Array.isArray(a.student?.skills) && a.student.skills.length > 0 && <div className="flex flex-wrap gap-1.5">
+                        {a.student.skills.map((skill) => <span key={skill} className="rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{skill}</span>)}
+                      </div>}
+                      <style>{`.application-details > p.text-xs { display: none; }`}</style>
                       <p className="text-xs text-gray-400">{a.student?.city} · {a.student?.skills}</p>
                     </div>
-                    {(a.status === 'pending' || !a.status) ? (
+                    {(a.status === 'pending' || !a.status) && canManageTasks ? (
                       <div className="flex gap-2">
-                        <button onClick={() => decide(a._id, 'approved')} className="btn-secondary !py-1.5 !px-3 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Approve</button>
-                        <button onClick={() => decide(a._id, 'rejected')} className="btn-secondary !py-1.5 !px-3 text-red-500"><XCircle className="h-4 w-4" /> Reject</button>
+                        <button onClick={() => decide(a._id || a.id, 'approved')} className="btn-secondary !py-1.5 !px-3 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Approve</button>
+                        <button onClick={() => decide(a._id || a.id, 'rejected')} className="btn-secondary !py-1.5 !px-3 text-red-500"><XCircle className="h-4 w-4" /> Reject</button>
                       </div>
                     ) : (
                       <span className={`badge ${a.status === 'approved' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40' : 'bg-red-50 text-red-500 dark:bg-red-950/40'}`}>{a.status}</span>
@@ -220,10 +268,19 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        {(canManageTasks || user?.role === 'student') && tasks.length >= 0 && (
+        {(canManageTasks || (user?.role === 'student' && isApprovedMember) || user?.role === 'admin') && (
           <div className="card p-5 space-y-4">
-            <h2 className="font-bold text-lg">Task Board</h2>
-            <KanbanBoard tasks={tasks} setTasks={setTasks} />
+            <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-bold text-lg">Task Board</h2>{canManageTasks && <button onClick={() => setAddingTask((open) => !open)} className="btn-primary !py-2"><Plus className="h-4 w-4" /> Add Task</button>}</div>
+            {addingTask && canManageTasks && <form onSubmit={createTask} className="grid gap-3 rounded-xl border border-gray-200 p-4 sm:grid-cols-2 dark:border-gray-800">
+              <input required className="input sm:col-span-2" placeholder="Task title" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} />
+              <textarea className="input sm:col-span-2" rows={2} placeholder="Task description (optional)" value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} />
+              <select required className="input" value={taskForm.assignedTo} onChange={(e) => setTaskForm({ ...taskForm, assignedTo: e.target.value })}><option value="">Assign to approved member</option>{(approvedAssignees.length ? approvedAssignees : approvedMembers).map((member) => <option key={member._id || member} value={member._id || member}>{member.name || 'Volunteer'}</option>)}</select>
+              <input required type="date" className="input" value={taskForm.deadline} onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })} />
+              <select className="input" value={taskForm.priority} onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}><option value="LOW">Low priority</option><option value="MEDIUM">Medium priority</option><option value="HIGH">High priority</option></select>
+              <button className="btn-primary">Create task</button>
+            </form>}
+            {user?.role === 'admin' && <p className="text-sm text-gray-500">Read-only view. Administrators can monitor progress without changing task assignments.</p>}
+            <KanbanBoard tasks={tasks} setTasks={setTasks} readOnly={user?.role === 'admin'} />
           </div>
         )}
 

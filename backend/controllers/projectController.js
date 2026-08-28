@@ -35,18 +35,17 @@ exports.createProject = catchAsync(async (req, res, next) => {
     parsedLocation = { city: String(location || '').trim(), address: String(location || '').trim() };
   }
 
-  const coordinates = parsedLocation.coordinates?.coordinates;
-  const hasCoordinates = Array.isArray(coordinates)
-    && coordinates.length === 2
-    && coordinates.every(Number.isFinite);
+  const legacyCoordinates = parsedLocation.coordinates?.coordinates;
+  const suppliedLat = Number(parsedLocation.coordinates?.lat ?? (Array.isArray(legacyCoordinates) ? legacyCoordinates[1] : NaN));
+  const suppliedLng = Number(parsedLocation.coordinates?.lng ?? (Array.isArray(legacyCoordinates) ? legacyCoordinates[0] : NaN));
 
   parsedLocation = {
     city: parsedLocation.city || parsedLocation.name || String(location || '').trim(),
     address: parsedLocation.address || '',
-    // Project.location.coordinates is GeoJSON and therefore stores [lng, lat].
-    coordinates: hasCoordinates
-      ? { type: 'Point', coordinates }
-      : { type: 'Point', coordinates: [73.0679, 33.6007] },
+    coordinates: {
+      lat: Number.isFinite(suppliedLat) ? suppliedLat : 33.6007,
+      lng: Number.isFinite(suppliedLng) ? suppliedLng : 73.0679,
+    },
   };
 
   const newProject = await Project.create({

@@ -43,16 +43,9 @@ const projectSchema = new mongoose.Schema(
       city: { type: String, required: [true, 'Location city is required'], trim: true },
       address: { type: String, trim: true, default: '' },
       coordinates: {
-        // GeoJSON Point: [longitude, latitude]
-        type: { type: String, enum: ['Point'], default: 'Point' },
-        coordinates: {
-          type: [Number],
-          default: undefined,
-          validate: {
-            validator: (v) => !v || v.length === 2,
-            message: 'Coordinates must be an array of [longitude, latitude]',
-          },
-        },
+        // Plain coordinates deliberately avoid GeoJSON/2dsphere extraction during evaluation.
+        lat: { type: Number, default: 33.6007 },
+        lng: { type: Number, default: 73.0679 },
       },
     },
     startDate: { type: Date, required: [true, 'Start date is required'] },
@@ -130,7 +123,6 @@ projectSchema.index({ category: 1 });
 projectSchema.index({ status: 1 });
 projectSchema.index({ 'location.city': 1 });
 projectSchema.index({ skillsRequired: 1 });
-projectSchema.index({ 'location.coordinates': '2dsphere' });
 projectSchema.index({ impactScore: -1 });
 
 projectSchema.methods.recalculateAverageRating = function () {

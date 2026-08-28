@@ -39,7 +39,7 @@ async function seed() {
     const endDate = new Date(startDate); endDate.setDate(startDate.getDate() + 21);
     return { title, category, requiredVolunteers, skillsRequired, projectManager: admin._id, status: 'active', startDate, endDate,
       description: `${title} brings neighbours, students, and local partners together for a practical, measurable community action in ${city}. Volunteers receive clear roles, on-site support, and a meaningful opportunity to contribute.`,
-      location: { city, address: `${city}, Pakistan`, coordinates: { type: 'Point', coordinates: [lng, lat] } },
+      location: { city, address: `${city}, Pakistan`, coordinates: { lat, lng } },
       projectImage: { url: `https://images.unsplash.com/photo-${['1542601906990-b4d3fb778b09','1485217988980-11786ced9454','1473448912268-2022ce9509d8','1509099836639-18ba1795216d','1505751172876-fa1923c5c528'][index % 5]}?auto=format&fit=crop&w=1600&q=85` },
       impactScore: 45 + index * 3,
     };

@@ -66,23 +66,23 @@ exports.getAllProjectsAdmin = catchAsync(async (req, res, next) => {
 
 // @route PATCH /api/v1/admin/projects/:id/approve
 exports.approveProject = catchAsync(async (req, res, next) => {
-  const project = await Project.findById(req.params.id).populate('projectManager');
-  if (!project) return next(new AppError('Project not found.', 404));
-  if (project.status !== 'pending_approval') return next(new AppError('This project is not pending approval.', 400));
-
-  project.status = 'active';
-  await project.save({ validateBeforeSave: false });
+  const approvedProject = await Project.findByIdAndUpdate(
+    req.params.id,
+    { status: 'active' },
+    { new: true, runValidators: false }
+  );
+  if (!approvedProject) return next(new AppError('Project not found.', 404));
 
   await createNotification({
-    recipient: project.projectManager._id,
+    recipient: approvedProject.projectManager,
     sender: req.user._id,
     type: 'project_approved',
     title: 'Project Approved',
-    message: `Your project "${project.title}" has been approved and is now live.`,
-    relatedProject: project._id,
-  });
+    message: `Your project "${approvedProject.title}" has been approved and is now live.`,
+    relatedProject: approvedProject._id,
+  }).catch((error) => console.error('Project approval notification failed:', error.message));
 
-  res.status(200).json({ status: 'success', data: { project } });
+  return res.status(200).json({ status: 'success', data: approvedProject });
 });
 
 // @route PATCH /api/v1/admin/projects/:id/reject

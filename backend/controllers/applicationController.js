@@ -29,7 +29,8 @@ exports.applyToProject = catchAsync(async (req, res, next) => {
     return next(new AppError('You have already applied to this project.', 409));
   }
 
-  if (project.currentVolunteersCount >= project.requiredVolunteers) {
+  const approvedCount = await Application.countDocuments({ project: project._id, status: 'approved' });
+  if (approvedCount >= project.requiredVolunteers) {
     return next(new AppError('This project has reached its required volunteer capacity.', 400));
   }
 
@@ -95,11 +96,9 @@ exports.decideApplication = catchAsync(async (req, res, next) => {
     return next(new AppError('You are not authorized to review this application.', 403));
   }
 
-  if (application.status !== 'pending') {
-    return next(new AppError('This application has already been reviewed.', 400));
-  }
-
-  if (decision === 'approved' && project.currentVolunteersCount >= project.requiredVolunteers) {
+  const wasApproved = application.status === 'approved';
+  const approvedCountBeforeDecision = await Application.countDocuments({ project: project._id, status: 'approved' });
+  if (decision === 'approved' && !wasApproved && approvedCountBeforeDecision >= project.requiredVolunteers) {
     return next(new AppError('This project has already reached its required volunteer capacity.', 400));
   }
 
@@ -111,13 +110,19 @@ exports.decideApplication = catchAsync(async (req, res, next) => {
 
   if (decision === 'approved') {
     const projectDoc = await Project.findById(project._id);
-    projectDoc.members.push({ user: application.student._id });
-    projectDoc.currentVolunteersCount = projectDoc.members.length;
+    const alreadyMember = projectDoc.members.some((member) => member.user.toString() === application.student._id.toString());
+    if (!alreadyMember) projectDoc.members.push({ user: application.student._id });
+    projectDoc.currentVolunteersCount = await Application.countDocuments({ project: project._id, status: 'approved' });
     await projectDoc.save({ validateBeforeSave: false });
 
-    await User.findByIdAndUpdate(application.student._id, {
+    if (!wasApproved) await User.findByIdAndUpdate(application.student._id, {
       $inc: { volunteerPoints: POINTS.JOIN_PROJECT, 'stats.projectsJoined': 1 },
     });
+  } else if (wasApproved) {
+    const projectDoc = await Project.findById(project._id);
+    projectDoc.members = projectDoc.members.filter((member) => member.user.toString() !== application.student._id.toString());
+    projectDoc.currentVolunteersCount = await Application.countDocuments({ project: project._id, status: 'approved' });
+    await projectDoc.save({ validateBeforeSave: false });
   }
 
   await createNotification({
@@ -133,5 +138,5 @@ exports.decideApplication = catchAsync(async (req, res, next) => {
     console.error('Application status email failed:', err.message)
   );
 
-  res.status(200).json({ status: 'success', data: { application } });
+  res.status(200).json({ status: 'success', data: application });
 });

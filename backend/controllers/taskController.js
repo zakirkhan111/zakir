@@ -37,7 +37,7 @@ exports.createTask = catchAsync(async (req, res, next) => {
   const project = await Project.findById(projectId);
   if (!project) return next(new AppError('Project not found.', 404));
 
-  if (project.projectManager.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+  if (project.projectManager.toString() !== req.user._id.toString()) {
     return next(new AppError('You are not authorized to assign tasks on this project.', 403));
   }
 
@@ -77,7 +77,22 @@ exports.createTask = catchAsync(async (req, res, next) => {
 
 // @route GET /api/v1/tasks/project/:projectId  (kanban board data)
 exports.getProjectTasks = catchAsync(async (req, res, next) => {
-  const tasks = await Task.find({ project: req.params.projectId })
+  const project = await Project.findById(req.params.projectId).select('projectManager members');
+  if (!project) return next(new AppError('Project not found.', 404));
+
+  const isManager = project.projectManager.toString() === req.user._id.toString();
+  const isMember = project.members.some((member) => member.user.toString() === req.user._id.toString());
+  if (req.user.role === 'student' && !isMember) {
+    return next(new AppError('You must be an approved project member to view its tasks.', 403));
+  }
+
+  const filter = { project: project._id };
+  if (req.user.role === 'student') filter.assignedTo = req.user._id;
+  if (!isManager && req.user.role !== 'student' && req.user.role !== 'admin') {
+    return next(new AppError('You are not authorized to view these tasks.', 403));
+  }
+
+  const tasks = await Task.find(filter)
     .populate('assignedTo', 'name profilePicture')
     .populate('assignedBy', 'name')
     .sort('-createdAt');
@@ -111,7 +126,7 @@ exports.updateTaskStatus = catchAsync(async (req, res, next) => {
 
   const isAssignee = task.assignedTo && task.assignedTo.toString() === req.user._id.toString();
   const isManager = task.project.projectManager.toString() === req.user._id.toString();
-  if (!isAssignee && !isManager && req.user.role !== 'admin') {
+  if (!isAssignee && !isManager) {
     return next(new AppError('You are not authorized to update this task.', 403));
   }
 
@@ -147,7 +162,7 @@ exports.updateTask = catchAsync(async (req, res, next) => {
   const task = await Task.findById(req.params.id).populate('project');
   if (!task) return next(new AppError('Task not found.', 404));
 
-  if (task.project.projectManager.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+  if (task.project.projectManager.toString() !== req.user._id.toString()) {
     return next(new AppError('You are not authorized to edit this task.', 403));
   }
 
@@ -165,7 +180,7 @@ exports.deleteTask = catchAsync(async (req, res, next) => {
   const task = await Task.findById(req.params.id).populate('project');
   if (!task) return next(new AppError('Task not found.', 404));
 
-  if (task.project.projectManager.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+  if (task.project.projectManager.toString() !== req.user._id.toString()) {
     return next(new AppError('You are not authorized to delete this task.', 403));
   }
 

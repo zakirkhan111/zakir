@@ -56,7 +56,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 py-12">
+    <div className="min-h-screen flex items-start justify-center p-6 py-12">
       <div className="w-full max-w-lg space-y-6">
         <div className="flex justify-center"><Logo size="lg" /></div>
         <div className="text-center">
@@ -64,7 +64,7 @@ export default function Register() {
           <p className="text-sm text-gray-500 mt-1">Join ImpactHub and start making a difference.</p>
         </div>
 
-        <div className="card p-6 sm:p-8 space-y-5">
+        <div className="card max-h-[85vh] overflow-y-auto pr-2 scrollbar-thin p-6 pb-12 space-y-5 sm:p-8 sm:pb-12">
           <div className="grid grid-cols-2 gap-3">
             {ROLES.map(({ value, label, icon: Icon }) => (
               <button
@@ -121,7 +121,7 @@ export default function Register() {
               </div>
               <div className="sm:col-span-2">
                 <label className="label">Skills</label>
-                <div className="relative">
+                <div>
                   <button type="button" onClick={() => setSkillsOpen((isOpen) => !isOpen)} aria-expanded={skillsOpen} className="input flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 text-left">
                     <span className="flex items-center gap-2 text-sm">
                       <Sparkles className="h-4 w-4 text-gray-400" />
@@ -129,7 +129,7 @@ export default function Register() {
                     </span>
                     <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${skillsOpen ? 'rotate-180' : ''}`} />
                   </button>
-                  {skillsOpen && <div className="absolute z-20 mt-2 w-full rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
+                  {skillsOpen && <div className="relative block mt-2 mb-6 w-full rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-gray-700 dark:bg-gray-900">
                     <div className="flex flex-wrap gap-2">
                       {SKILL_OPTIONS.map((skill) => (
                         <button type="button" key={skill} onClick={() => toggleSkill(skill)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${selectedSkills.includes(skill) ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-brand-50 dark:bg-gray-800 dark:text-gray-300'}`}>
